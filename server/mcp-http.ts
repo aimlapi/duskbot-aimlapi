@@ -185,7 +185,12 @@ export class RemoteMcpClient {
 
   constructor(target: RemoteMcpSpec, options: { fetch?: typeof fetch; maxBytes?: number; onNotification?: (message: JsonRpcMessage) => void } = {}) {
     this.target = target;
-    this.fetchImpl = options.fetch ?? fetch;
+    const fetchImpl = options.fetch ?? fetch;
+    this.fetchImpl = new URL(target.url).hostname === "mcp.aimlapi.com" ? (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.origin !== "https://mcp.aimlapi.com") return Promise.reject(new McpHttpError("network", "unexpected MCP origin"));
+      return fetchImpl(input, { ...init, redirect: "error" });
+    } : fetchImpl;
     this.maxBytes = options.maxBytes ?? MAX_REMOTE_MCP_BYTES;
     this.onNotification = options.onNotification;
   }

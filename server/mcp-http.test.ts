@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { McpRpcError, RemoteMcpClient, bypassesProxy, plainHttpProxyFetch } from "./mcp-http.ts";
@@ -70,5 +71,46 @@ describe("which plain http requests go through HTTP_PROXY", () => {
     await viaProxy("http://mcp.corp.internal/mcp");
     await viaProxy("http://127.0.0.1:4000/mcp");
     expect(seen).toEqual(["https://mcp.example.test/mcp", "http://mcp.corp.internal/mcp", "http://127.0.0.1:4000/mcp"]);
+  });
+});
+
+describe("AI/ML API credential boundaries", () => {
+  it("sends the configured bearer only to the exact HTTPS endpoint and refuses redirects", async () => {
+    let leaked = false;
+    const redirect = createServer((req, res) => {
+      if (req.url === "/foreign") { leaked = true; res.end(); }
+      else { res.writeHead(307, { location: "/foreign" }); res.end(); }
+    });
+    await new Promise<void>((resolve) => redirect.listen(0, "127.0.0.1", resolve));
+    const address = redirect.address() as { port: number };
+    const calls: string[] = [];
+    client = new RemoteMcpClient({ type: "http", url: "https://mcp.aimlapi.com/mcp", headers: { authorization: "Bearer fixture-token" } }, {
+      fetch: async (input, init) => {
+        calls.push(String(input));
+        expect(new Headers(init?.headers).get("authorization")).toBe("Bearer fixture-token");
+        expect(new Headers(init?.headers).has("x-aimlapi-source")).toBe(false);
+        expect(init?.redirect).toBe("error");
+        return fetch(`http://127.0.0.1:${address.port}/redirect`, init);
+      },
+    });
+    try {
+      await expect(client.request("tools/list", {}, AbortSignal.timeout(1_000))).rejects.toThrow("request failed");
+      expect(leaked).toBe(false);
+    } finally {
+      await new Promise<void>((resolve) => redirect.close(() => resolve()));
+    }
+    expect(calls).toEqual(["https://mcp.aimlapi.com/mcp"]);
+  });
+
+  it("does not send credentials to an insecure or alternate-port origin", async () => {
+    for (const url of ["http://mcp.aimlapi.com/mcp", "https://mcp.aimlapi.com:8443/mcp"]) {
+      let calls = 0;
+      const blocked = new RemoteMcpClient({ type: "http", url, headers: { authorization: "Bearer fixture-token" } }, {
+        fetch: async () => { calls++; return new Response(); },
+      });
+      await expect(blocked.request("tools/list", {}, AbortSignal.timeout(1_000))).rejects.toThrow("request failed");
+      expect(calls).toBe(0);
+      await blocked.close();
+    }
   });
 });

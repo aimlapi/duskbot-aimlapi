@@ -62,6 +62,14 @@ describe("connectorDirectory", () => {
 });
 
 describe("remote MCP apps", () => {
+  it("offers AI/ML API through sign-in with explicit pricing", async () => {
+    const entries = await remoteMcpProvider.catalog(new AbortController().signal);
+    expect(entries.filter((entry) => entry.id === "aimlapi")).toEqual([expect.objectContaining({
+      label: "AI/ML API", url: "https://mcp.aimlapi.com/mcp", auth: "oauth", source: "remote-mcp",
+      description: expect.stringContaining("generation, chat, embeddings and tools_run are pay-as-you-go"),
+    })]);
+    expect(entries.find((entry) => entry.id === "aimlapi")?.description).toContain("Model lookups and account checks are free");
+  });
   it("are valid server names on vendor https endpoints, once each", () => {
     expect(new Set(REMOTE_MCP_APPS.map((entry) => entry.id)).size).toBe(REMOTE_MCP_APPS.length);
     for (const entry of REMOTE_MCP_APPS) {

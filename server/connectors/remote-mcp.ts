@@ -11,6 +11,7 @@ type Row = [id: string, label: string, url: string, domain: string, category: st
 // asana v2, render, pagerduty, smartsheet, calendly, gamma), refuses unreviewed clients (figma, dropbox: dropbox signs in
 // through dusk bot's own app instead, shared/native-connectors.json), or no OAuth at all (similarweb).
 const OAUTH: readonly Row[] = [
+  ["aimlapi", "AI/ML API", "https://mcp.aimlapi.com/mcp", "aimlapi.com", "developer research", "Search and run tools and models. Model lookups and account checks are free; generation, chat, embeddings and tools_run are pay-as-you-go"],
   ["linear", "Linear", "https://mcp.linear.app/mcp", "linear.app", "project management", "Issues, projects and cycles in Linear"],
   ["notion", "Notion", "https://mcp.notion.com/mcp", "notion.so", "documents notes", "Search, read and write pages and databases"],
   ["atlassian", "Atlassian", "https://mcp.atlassian.com/v2/mcp", "atlassian.com", "project management", "Jira issues and Confluence pages"],
